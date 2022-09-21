@@ -142,7 +142,9 @@ func (c *Client) getNodesInfo() ([]nodeInfo, error) {
 	c.setReqAuth(conn.URL, req)
 	c.setReqUserAgent(req)
 
-	res, err := c.transport.RoundTrip(req)
+	transport := &http.Transport{}
+
+	res, err := transport.RoundTrip(req)
 	if err != nil {
 		return out, err
 	}

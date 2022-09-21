@@ -20,15 +20,9 @@ package elastictransport
 import (
 	"bytes"
 	"compress/gzip"
-	"crypto/sha256"
-	"crypto/tls"
-	"crypto/x509"
-	"encoding/hex"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -90,7 +84,7 @@ type Config struct {
 
 	DiscoverNodesInterval time.Duration
 
-	Transport http.RoundTripper
+	//Transport http.RoundTripper
 	Logger    Logger
 	Selector  Selector
 
@@ -128,7 +122,7 @@ type Client struct {
 
 	metrics *metrics
 
-	transport http.RoundTripper
+	//transport http.RoundTripper
 	logger    Logger
 	selector  Selector
 	pool      ConnectionPool
@@ -140,51 +134,51 @@ type Client struct {
 // http.DefaultTransport will be used if no transport is passed in the configuration.
 //
 func New(cfg Config) (*Client, error) {
-	if cfg.Transport == nil {
-		cfg.Transport = http.DefaultTransport
-	}
-
-	if transport, ok := cfg.Transport.(*http.Transport); ok {
-		if cfg.CertificateFingerprint != "" {
-			transport.DialTLS = func(network, addr string) (net.Conn, error) {
-				fingerprint, _ := hex.DecodeString(cfg.CertificateFingerprint)
-
-				c, err := tls.Dial(network, addr, &tls.Config{InsecureSkipVerify: true})
-				if err != nil {
-					return nil, err
-				}
-
-				// Retrieve the connection state from the remote server.
-				cState := c.ConnectionState()
-				for _, cert := range cState.PeerCertificates {
-					// Compute digest for each certificate.
-					digest := sha256.Sum256(cert.Raw)
-
-					// Provided fingerprint should match at least one certificate from remote before we continue.
-					if bytes.Compare(digest[0:], fingerprint) == 0 {
-						return c, nil
-					}
-				}
-				return nil, fmt.Errorf("fingerprint mismatch, provided: %s", cfg.CertificateFingerprint)
-			}
-		}
-	}
-
-	if cfg.CACert != nil {
-		httpTransport, ok := cfg.Transport.(*http.Transport)
-		if !ok {
-			return nil, fmt.Errorf("unable to set CA certificate for transport of type %T", cfg.Transport)
-		}
-
-		httpTransport = httpTransport.Clone()
-		httpTransport.TLSClientConfig.RootCAs = x509.NewCertPool()
-
-		if ok := httpTransport.TLSClientConfig.RootCAs.AppendCertsFromPEM(cfg.CACert); !ok {
-			return nil, errors.New("unable to add CA certificate")
-		}
-
-		cfg.Transport = httpTransport
-	}
+	//if cfg.Transport == nil {
+	//	cfg.Transport = http.DefaultTransport
+	//}
+	//
+	//if transport, ok := cfg.Transport.(*http.Transport); ok {
+	//	if cfg.CertificateFingerprint != "" {
+	//		transport.DialTLS = func(network, addr string) (net.Conn, error) {
+	//			fingerprint, _ := hex.DecodeString(cfg.CertificateFingerprint)
+	//
+	//			c, err := tls.Dial(network, addr, &tls.Config{InsecureSkipVerify: true})
+	//			if err != nil {
+	//				return nil, err
+	//			}
+	//
+	//			// Retrieve the connection state from the remote server.
+	//			cState := c.ConnectionState()
+	//			for _, cert := range cState.PeerCertificates {
+	//				// Compute digest for each certificate.
+	//				digest := sha256.Sum256(cert.Raw)
+	//
+	//				// Provided fingerprint should match at least one certificate from remote before we continue.
+	//				if bytes.Compare(digest[0:], fingerprint) == 0 {
+	//					return c, nil
+	//				}
+	//			}
+	//			return nil, fmt.Errorf("fingerprint mismatch, provided: %s", cfg.CertificateFingerprint)
+	//		}
+	//	}
+	//}
+	//
+	//if cfg.CACert != nil {
+	//	httpTransport, ok := cfg.Transport.(*http.Transport)
+	//	if !ok {
+	//		return nil, fmt.Errorf("unable to set CA certificate for transport of type %T", cfg.Transport)
+	//	}
+	//
+	//	httpTransport = httpTransport.Clone()
+	//	httpTransport.TLSClientConfig.RootCAs = x509.NewCertPool()
+	//
+	//	if ok := httpTransport.TLSClientConfig.RootCAs.AppendCertsFromPEM(cfg.CACert); !ok {
+	//		return nil, errors.New("unable to add CA certificate")
+	//	}
+	//
+	//	cfg.Transport = httpTransport
+	//}
 
 	if len(cfg.RetryOnStatus) == 0 {
 		cfg.RetryOnStatus = defaultRetryOnStatus[:]
@@ -218,7 +212,7 @@ func New(cfg Config) (*Client, error) {
 
 		compressRequestBody: cfg.CompressRequestBody,
 
-		transport: cfg.Transport,
+		//transport: cfg.Transport,
 		logger:    cfg.Logger,
 		selector:  cfg.Selector,
 		poolFunc:  cfg.ConnectionPoolFunc,
@@ -337,9 +331,60 @@ func (c *Client) Perform(req *http.Request) (*http.Response, error) {
 			req.Body = body
 		}
 
+		transport := &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          100,
+			IdleConnTimeout:       90 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		}
+
+		//	if cfg.CertificateFingerprint != "" {
+		//		transport.DialTLS = func(network, addr string) (net.Conn, error) {
+		//			fingerprint, _ := hex.DecodeString(cfg.CertificateFingerprint)
+		//
+		//			c, err := tls.Dial(network, addr, &tls.Config{InsecureSkipVerify: true})
+		//			if err != nil {
+		//				return nil, err
+		//			}
+		//
+		//			// Retrieve the connection state from the remote server.
+		//			cState := c.ConnectionState()
+		//			for _, cert := range cState.PeerCertificates {
+		//				// Compute digest for each certificate.
+		//				digest := sha256.Sum256(cert.Raw)
+		//
+		//				// Provided fingerprint should match at least one certificate from remote before we continue.
+		//				if bytes.Compare(digest[0:], fingerprint) == 0 {
+		//					return c, nil
+		//				}
+		//			}
+		//			return nil, fmt.Errorf("fingerprint mismatch, provided: %s", cfg.CertificateFingerprint)
+		//		}
+		//	}
+		//
+		//
+		//if cfg.CACert != nil {
+		//	httpTransport, ok := cfg.Transport.(*http.Transport)
+		//	if !ok {
+		//		return nil, fmt.Errorf("unable to set CA certificate for transport of type %T", cfg.Transport)
+		//	}
+		//
+		//	httpTransport = httpTransport.Clone()
+		//	httpTransport.TLSClientConfig.RootCAs = x509.NewCertPool()
+		//
+		//	if ok := httpTransport.TLSClientConfig.RootCAs.AppendCertsFromPEM(cfg.CACert); !ok {
+		//		return nil, errors.New("unable to add CA certificate")
+		//	}
+		//
+		//	cfg.Transport = httpTransport
+		//}
+		
+
 		// Set up time measures and execute the request
 		start := time.Now().UTC()
-		res, err = c.transport.RoundTrip(req)
+		res, err = transport.RoundTrip(req)
 		dur := time.Since(start)
 
 		// Log request and response
