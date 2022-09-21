@@ -31,7 +31,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/elastic/elastic-transport-go/v8/elastictransport"
+	"github.com/smcdonald45/elastic-transport-go/v8/elastictransport"
 )
 
 var (
